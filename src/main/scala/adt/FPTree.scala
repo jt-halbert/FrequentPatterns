@@ -4,6 +4,7 @@ import adt.FPTree.Transaction
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
+import scala.None
 
 
 /**
@@ -32,19 +33,16 @@ object FPTree {
   var frequentItemHeader = mutable.Map.empty[String, ListBuffer[FPNode]]
   var orderedItems: List[String] = List()
 
-  /**
-   * Construct an empty FPTree.
-   */
-  def empty: FPTree = new FPTree(FPNode("",null, ListBuffer()), frequentItemHeader)
-
   //TODO: create a richer Transaction class
-  def apply(transactions: List[Transaction]): FPTree = {
+  def apply(transactions: List[Transaction], supportThreshold: Int = 0): FPTree = {
     val freqList = transactions.flatten.groupBy(w => w).mapValues(_.size).
       toList.sortBy(_._2).reverse
-
-    orderedItems = freqList.map(_._1) //TODO: implement a check here for freq threshold
-    //orderedItems = List("f","c","a","b","m","p")
-    transactions.foldLeft(FPTree.empty)(_ insert _)
+    orderedItems = freqList.filter(_._2 > supportThreshold).map(_._1)
+    //TODO: the frequentItems should not be mutable after first pass
+    var start = new FPTree(FPNode("",null,ListBuffer()),frequentItemHeader)
+    start.supportThreshold = supportThreshold
+    start.frequentItems = orderedItems //TODO: this is a placeholder till I figure out right way
+    transactions.foldLeft(start)(_ insert _)
   }
 }
 
@@ -116,6 +114,9 @@ case class FPNode(itemName: String,parent: Node, children: ListBuffer[Node]) ext
 case class FPTree(root: Node,
                   frequentItemHeader: mutable.Map[String,ListBuffer[FPNode]]) {
 
+  var supportThreshold: Int = 0
+  var frequentItems: List[String] = List()
+
   def preOrderWalk(visit: Node => Any) {
     def recur(n: Node) {
       visit(n)
@@ -142,10 +143,8 @@ case class FPTree(root: Node,
    * @return
    */
   def insert(transaction: Transaction): FPTree = {
-    val freqItems = transaction.filter(FPTree.orderedItems.contains(_)).
-      sortBy(FPTree.orderedItems.indexOf(_))
-    val r = root.insert(freqItems)
-    FPTree(r, FPTree.frequentItemHeader)
+    root.insert(frequentItemProjection(transaction))
+    this
   }
 
   def conditionalFPTree(itemName: String): FPTree = {
@@ -156,6 +155,38 @@ case class FPTree(root: Node,
       }
     })
 
+  }
+
+  /**
+   * Given a transaction database and a support threshold we construct
+   * the frequent items in that database.  For every transaction the
+   * frequentItemProjections(trans) is the items in the order they appear in
+   * the frequentItems list.
+   *
+   * @param trans a transaction direct from the database
+   * @return a projection of the transaction: only the frequent items in
+   *         decreasing frequency order.
+   */
+  def frequentItemProjection(trans: Transaction): List[String] = {
+    trans.filter(frequentItems.contains(_)).sortBy(frequentItems.indexOf(_))
+  }
+
+  /**
+   * takes a transaction and walks the tree to determine if it is contained
+   * @param trans the transaction to be walked
+   * @return
+   */
+  def contains(trans: Transaction): Boolean = {
+    def recur(n: Node, t: Transaction): Boolean = {
+      if (t.isEmpty) true
+      else {
+        n.children.find(_.itemName==t.head) match {
+          case Some(node) => recur(node, t.tail)
+          case None => false
+        }
+      }
+    }
+    recur(root, trans)
   }
 
   /**
