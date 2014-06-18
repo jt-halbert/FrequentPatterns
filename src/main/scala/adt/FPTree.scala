@@ -1,11 +1,10 @@
 package adt
 
-import adt.FPTree.{ItemTable, Transaction}
+import adt.FPTree.{Item, ItemTable, Transaction}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.None
-import scala.util.control.TailCalls.TailRec
 import scala.annotation.tailrec
 
 
@@ -27,19 +26,27 @@ object FPTree {
   /**
    * Construct an FPTree from a sequence of transactions
    */
+  type Item = String
+  type ItemSet = List[Item]
   type Transaction = List[String]
+  //note the distiction between this and ItemSet
+  type TransactionDB = List[Transaction]
 
-  type ItemTable = mutable.Map[String, Node]
+  type ItemTable = mutable.Map[Item, Node]
 
-  //TODO: create a richer Transaction class
-  def apply(transactions: List[Transaction], supportThreshold: Int = 0): FPTree = {
+  //TODO: refactor code to use Item, ItemSet, Transaction, TransactionDB
+  def apply(transactions: TransactionDB,
+            supportThreshold: Int = 0,
+            select: (Transaction => ItemSet) = x => x): FPTree = {
+    //TODO: Consider putting in the select function above to pull ItemSets out of a transaction
+    // transit the DB once to collect the items and their frequency
     val freqList = transactions.flatten.groupBy(w => w).mapValues(_.size).
       toList.sortBy(_._2).reverse
-    val emptyHeader = mutable.Map.empty[String,Node]
-    //TODO: the frequentItems should not be mutable after first pass
-    val start = new FPTree(FPNode("", null, ListBuffer()), emptyHeader)
-    start.supportThreshold = supportThreshold
-    start.frequentItems = freqList.takeWhile(_._2 > supportThreshold).map(_._1)
+    val emptyRoot = FPNode("", null, ListBuffer())
+
+    // only proceed with items that exceed the supportThreshold
+    val frequentItems = freqList.takeWhile(_._2 > supportThreshold).map(_._1)
+    val start = new FPTree(emptyRoot, supportThreshold, frequentItems)
     transactions.foldLeft(start)(_ insert _)
   }
 }
@@ -82,7 +89,7 @@ abstract class Node {
           r.children += newNode
           if (frequentItemHeader.contains(items.head)) {
             //add new nodeLink in the chain
-            frequentItemHeader(items.head).findLastLink().nodeLink = newNode
+            frequentItemHeader(items.head).lastNodeLinked.nodeLink = newNode
           } else {
             frequentItemHeader(items.head) = newNode
           }
@@ -94,11 +101,11 @@ abstract class Node {
     this
   }
 
-  def findLastLink():Node = {
-    if (nodeLink==null) this else nodeLink.findLastLink()
+  def lastNodeLinked: Node = {
+    if (nodeLink == null) this else nodeLink.lastNodeLinked
   }
 
-  def nodeLinkList : List[Node] = {
+  def nodeLinkList: List[Node] = {
     if (nodeLink == null) List(this) else this :: nodeLink.nodeLinkList
   }
 
@@ -126,11 +133,13 @@ case class FPNode(itemName: String, parent: Node, children: ListBuffer[Node]) ex
  * 3) Each entry in the frequentItemHeader table consists of two fields:
  * (a) itemName and
  * (b) ListBuffer of Nodes that all have the itemName
+ *
+ * Note: we put the val objects in to the call parameters that we will
+ * have when we construct it.
  */
-case class FPTree(root: Node, var frequentItemHeader: ItemTable) {
+case class FPTree(root: Node, supportThreshold: Int, frequentItems: List[Item]) {
 
-  var supportThreshold: Int = 0
-  var frequentItems: List[String] = List()
+  var frequentItemHeader = mutable.Map.empty[Item, Node]
 
   def preOrderWalk(visit: Node => Any) {
     def recur(n: Node) {
@@ -175,12 +184,12 @@ case class FPTree(root: Node, var frequentItemHeader: ItemTable) {
    */
   def insertPatternBase(patternBase: (List[String], Int)): FPTree = {
     val (pattern, count) = patternBase
-    def recur(pattern: List[String], n: Node) : Unit = {
+    def recur(pattern: List[String], n: Node): Unit = {
       if (pattern.nonEmpty) {
         n.children.find(_.itemName == pattern.head) match {
           case Some(node) => //update child
             node.count += count
-            recur(pattern.tail,node)
+            recur(pattern.tail, node)
           case None => //add child
             val newNode = new FPNode(pattern.head, n, ListBuffer())
             newNode.count = count
@@ -188,8 +197,9 @@ case class FPTree(root: Node, var frequentItemHeader: ItemTable) {
             if (frequentItemHeader.contains(pattern.head)) {
               //add new nodeLink in the chain
               frequentItemHeader(pattern.head)
-                .findLastLink().nodeLink = newNode
+                .lastNodeLinked.nodeLink = newNode
             } else {
+              //add to the table
               frequentItemHeader(pattern.head) = newNode
             }
             recur(pattern.tail, newNode)
@@ -201,11 +211,10 @@ case class FPTree(root: Node, var frequentItemHeader: ItemTable) {
   }
 
   def conditionalFPTree(itemName: String): FPTree = {
-    val start = new FPTree(FPNode("", null, ListBuffer()),
-      mutable.Map.empty[String, Node])
-    conditionalPatternBase(itemName)
-      .filter(_._2 > this.supportThreshold) // only propagate frequent patterns
-      .foldLeft(start)(_ insertPatternBase _)
+    val emptyRoot = FPNode("", null, ListBuffer())
+    val start = new FPTree(emptyRoot, supportThreshold, frequentItems)
+    //TODO: removed filter on supportThreshold.  Is that right?
+    conditionalPatternBase(itemName).foldLeft(start)(_ insertPatternBase _)
 
   }
 
