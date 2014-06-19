@@ -1,6 +1,7 @@
 package com.tetra.transformers
 
-import scala.collection.mutable.ListBuffer
+import adt.FPTree.{Transaction, ItemSet, TransactionDB}
+import adt.FPTree
 
 /**
  * This is the overarching application that transforms transaction DBs
@@ -9,6 +10,21 @@ import scala.collection.mutable.ListBuffer
  *
  * Created by jthalbert on 6/16/14.
  */
-class FrequentPatterns {
+
+object FrequentPatterns {
+
+  // a Pattern is an item set together with how often it occurs in the DB
+  type Pattern = (ItemSet, Int)
+
+  /**
+   * Take in a list of Transactions and create an FPTree
+   */
+  def apply(transactions: TransactionDB,
+             supportThreshold: Int = 0,
+             select: (Transaction => ItemSet) = x => x): List[Pattern] = {
+    val fp = FPTree(transactions, supportThreshold, select)
+    fp.FPGrowth
+  }
 
 }
+

@@ -1,6 +1,7 @@
 package adt
 
 import adt.FPTree.{Item, ItemTable, Transaction}
+import com.tetra.transformers.FrequentPatterns.Pattern
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -139,6 +140,7 @@ case class FPNode(itemName: String, parent: Node, children: ListBuffer[Node]) ex
  */
 case class FPTree(root: Node, supportThreshold: Int, frequentItems: List[Item]) {
 
+
   var frequentItemHeader = mutable.Map.empty[Item, Node]
 
   def preOrderWalk(visit: Node => Any) {
@@ -148,6 +150,18 @@ case class FPTree(root: Node, supportThreshold: Int, frequentItems: List[Item]) 
     }
     recur(root)
   }
+
+  def toList: List[(String, Int)] = {
+    def recur(n: Node): List[(String, Int)] = {
+      if (n.itemName.nonEmpty) {
+        (n.itemName, n.count) :: n.children.map(recur).toList.flatten
+      } else {
+        n.children.map(recur).toList.flatten
+      }
+    }
+    recur(root)
+  }
+
 
   def postOrderWalk(visit: Node => Any) {
     def recur(n: Node) {
@@ -233,10 +247,38 @@ case class FPTree(root: Node, supportThreshold: Int, frequentItems: List[Item]) 
       .flatten //flatten it to a list of String,Int tuples
       .groupBy(_._1) //gather by itemName into a Map
       .mapValues(_.map(_._2).sum) //sum counts
-      .toList.sortBy(_._2).reverse //sort by decreasing frequency
-      .takeWhile(_._2 > supportThreshold).map(_._1) // take the names of the frequent ones
+      .toList.filter(_._2 > supportThreshold).map(_._1) // take the names of the frequent ones
+      .sortBy(frequentItems.indexOf(_)) // sort into the node occurrence order
     val start = new FPTree(emptyRoot, supportThreshold, freqItems)
     conditionalPatternBase(itemName).foldLeft(start)(_ insertPatternBase _)
+  }
+
+  /**
+   * In order to implement FP-growth I need the ability to split a tree into
+   * Single prefix path and multi-path portions.
+   */
+//  def splitTree: (FPTree, FPTree) = {
+//    def findFork(n:Node): Node = {
+//      if (n.children.length != 1) n
+//      else findFork(n.children(0))
+//    }
+//    val fork = findFork(root)
+//    val newLeaf = new FPNode(fork.itemName,fork.parent,ListBuffer())
+//    newLeaf.count = fork.count
+//    fork.parent.children(0) == newLeaf
+//    val newRoot = new FPNode("", null, ListBuffer())
+//    newRoot.children=fork.children
+//    val multiPathPortion = new FPTree(newRoot,supportThreshold,frequentItems)
+//    (this, multiPathPortion)
+//  }
+
+  def isSinglePath: Boolean = {
+    def recur(n: Node): Boolean = {
+      if (n.children.length == 0) true
+      else if (n.children.length > 1) false
+      else recur(n.children(0))
+    }
+    recur(root)
   }
 
   /**
@@ -294,6 +336,19 @@ case class FPTree(root: Node, supportThreshold: Int, frequentItems: List[Item]) 
           else acc
         }
         (walkUp(n, List()), n.count) :: l
+      }
+    })
+  }
+
+
+  def FPGrowth: List[Pattern] = {
+    frequentItems.foldLeft(List[Pattern]())((patterns, item) => {
+      val cfp = conditionalFPTree(item)
+      if (cfp.isSinglePath) {
+        //pop out the combinations with counts correct
+        ???
+      } else {
+        patterns ::: cfp.FPGrowth
       }
     })
   }
