@@ -206,16 +206,37 @@ case class FPTree(root: Node, supportThreshold: Int, frequentItems: List[Item]) 
         }
       }
     }
-    recur(pattern, this.root)
+    // before inserting we remove infrequent patterns (i.e. project to frequent items)
+    recur(frequentItemProjection(pattern), this.root)
     this
   }
 
   def conditionalFPTree(itemName: String): FPTree = {
     val emptyRoot = FPNode("", null, ListBuffer())
-    val start = new FPTree(emptyRoot, supportThreshold, frequentItems)
-    //TODO: removed filter on supportThreshold.  Is that right?
+    // form the frequent items for this new smaller DB
+    val conditionalDB = conditionalPatternBase(itemName)
+    // one pass to take List[(List[String], Int)] to a histogram
+    /**
+     * we choose to represent the intermediate patterns as List[(List[String],Int)]
+     * e.g.
+     *      List((List(c, f, b, m),1), (List(c, f, p, m),2))
+     *
+     * This needs to be transformed into a frequency-sorted and filtered histogram:
+     * List[(String, Int)] e.g. List((c,3),(m,3),(f,3),(p,2),(b,1))
+     *
+     *
+     */
+    val freqItems = conditionalDB.map(t => {
+      // split each List, Int tuple into a sequence of String,Int tuples
+      t._1.foldLeft(List[(String, Int)]())((acc,n) => (n,t._2) :: acc)
+    })
+      .flatten //flatten it to a list of String,Int tuples
+      .groupBy(_._1) //gather by itemName into a Map
+      .mapValues(_.map(_._2).sum) //sum counts
+      .toList.sortBy(_._2).reverse //sort by decreasing frequency
+      .takeWhile(_._2 > supportThreshold).map(_._1) // take the names of the frequent ones
+    val start = new FPTree(emptyRoot, supportThreshold, freqItems)
     conditionalPatternBase(itemName).foldLeft(start)(_ insertPatternBase _)
-
   }
 
   /**
