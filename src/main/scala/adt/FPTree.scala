@@ -340,11 +340,13 @@ case class FPTree(root: Node, supportThreshold: Int, frequentItems: List[Item]) 
     })
   }
 
-
+  //TODO: move out to a utility class somewhere
   def combinations(base:Item,
                    singlePath: List[(Item, Int)]): List[Pattern] = {
     (1 to singlePath.length).map(n => {
+      // gather all the subsequences of size n
       val orderedPrefixs = orderedSubsequences(singlePath,n)
+      // for each one of these merge it with the base item and get count right
       orderedPrefixs.map(op => {
         val min = op.map(_._2).min //TODO: refactor to do this biz in one pass
         (op.map(_._1) ::: List(base), min)
@@ -390,7 +392,7 @@ case class FPTree(root: Node, supportThreshold: Int, frequentItems: List[Item]) 
       val itemCount = frequentItemHeader(item).nodeLinkList.map(_.count).sum
       if (cfp.isSinglePath) {
         //pop out the combinations with counts correct
-        (List(item), itemCount) :: combinations(item, cfp.toList)::: patterns
+        patterns ::: List((List(item), itemCount)) ::: combinations(item, cfp.toList)
       } else {
         patterns ::: cfp.FPGrowth
       }
