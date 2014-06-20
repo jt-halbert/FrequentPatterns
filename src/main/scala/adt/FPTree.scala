@@ -341,12 +341,56 @@ case class FPTree(root: Node, supportThreshold: Int, frequentItems: List[Item]) 
   }
 
 
+  def combinations(base:Item,
+                   singlePath: List[(Item, Int)]): List[Pattern] = {
+    (1 to singlePath.length).map(n => {
+      val orderedPrefixs = orderedSubsequences(singlePath,n)
+      orderedPrefixs.map(op => {
+        val min = op.map(_._2).min //TODO: refactor to do this biz in one pass
+        (op.map(_._1) ::: List(base), min)
+      })
+    }).toList.flatten
+  }
+
+  /**
+   * In order to generate all the patterns I need to be able to calculate all the
+   * ordered distinct subsequences of a list.  e.g.
+   *
+   * input: (a,b,c,d)
+   * output: orderedSubsequences(input, 1) = ((a), (b), (c), (d))
+   *         orderedSubsequences(input, 2) = ((a,b), (a,c), (a,d), (b,c), (b,d), (c,d)
+   *         orderedSubsequences(input, 3) = ((a,b,c), (a,b,d), (a,c,d), (b,c,d))
+   *         orderedSubsequences(input, 4) = ((a,b,c,d))
+   *
+   * There is a recursive relationship to be exploited here: at level n I generate by
+   * looking back to level n-1.  emit a joined run of everything greater than the last element
+   * of the previous generation's pattern.
+   *
+   * @param list
+   * @param length
+   * @tparam T
+   * @return
+   */
+  //TODO: memoize for performance improvement
+  def orderedSubsequences[T](list: List[T], length: Int): List[List[T]] = length match {
+    case 0 => List(List())
+    case 1 => list.map(List(_))
+    case n if n < list.length =>
+      orderedSubsequences(list,n-1).map(l => { // for each of the prior sequences
+        list.drop(list.indexOf(l.last)+1) // for each element of the list to the right
+          .map(elem => l ::: List(elem)) //build a new list
+      }).flatten // flatten :)
+    case n if n == list.length => List(list)
+  }
+
   def FPGrowth: List[Pattern] = {
     frequentItems.foldLeft(List[Pattern]())((patterns, item) => {
       val cfp = conditionalFPTree(item)
+      // TODO: Is this the best way to get the count... seems wasteful
+      val itemCount = frequentItemHeader(item).nodeLinkList.map(_.count).sum
       if (cfp.isSinglePath) {
         //pop out the combinations with counts correct
-        ???
+        (List(item), itemCount) :: combinations(item, cfp.toList)::: patterns
       } else {
         patterns ::: cfp.FPGrowth
       }
