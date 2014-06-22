@@ -1,11 +1,11 @@
-package adt
+package com.tetra.adt
 
-import adt.FPTree.{Item, ItemTable, Transaction}
+import com.tetra.adt.FPTree.{ItemSet, ItemTable, Item, Transaction}
 import com.tetra.transformers.FrequentPatterns.Pattern
+import com.tetra.utilities.ListMethods
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
-import scala.None
 import scala.annotation.tailrec
 
 
@@ -233,7 +233,7 @@ case class FPTree(root: Node, supportThreshold: Int, frequentItems: List[Item]) 
     /**
      * we choose to represent the intermediate patterns as List[(List[String],Int)]
      * e.g.
-     *      List((List(c, f, b, m),1), (List(c, f, p, m),2))
+     * List((List(c, f, b, m),1), (List(c, f, p, m),2))
      *
      * This needs to be transformed into a frequency-sorted and filtered histogram:
      * List[(String, Int)] e.g. List((c,3),(m,3),(f,3),(p,2),(b,1))
@@ -242,7 +242,7 @@ case class FPTree(root: Node, supportThreshold: Int, frequentItems: List[Item]) 
      */
     val freqItems = conditionalDB.map(t => {
       // split each List, Int tuple into a sequence of String,Int tuples
-      t._1.foldLeft(List[(String, Int)]())((acc,n) => (n,t._2) :: acc)
+      t._1.foldLeft(List[(String, Int)]())((acc, n) => (n, t._2) :: acc)
     })
       .flatten //flatten it to a list of String,Int tuples
       .groupBy(_._1) //gather by itemName into a Map
@@ -257,20 +257,20 @@ case class FPTree(root: Node, supportThreshold: Int, frequentItems: List[Item]) 
    * In order to implement FP-growth I need the ability to split a tree into
    * Single prefix path and multi-path portions.
    */
-//  def splitTree: (FPTree, FPTree) = {
-//    def findFork(n:Node): Node = {
-//      if (n.children.length != 1) n
-//      else findFork(n.children(0))
-//    }
-//    val fork = findFork(root)
-//    val newLeaf = new FPNode(fork.itemName,fork.parent,ListBuffer())
-//    newLeaf.count = fork.count
-//    fork.parent.children(0) == newLeaf
-//    val newRoot = new FPNode("", null, ListBuffer())
-//    newRoot.children=fork.children
-//    val multiPathPortion = new FPTree(newRoot,supportThreshold,frequentItems)
-//    (this, multiPathPortion)
-//  }
+  //  def splitTree: (FPTree, FPTree) = {
+  //    def findFork(n:Node): Node = {
+  //      if (n.children.length != 1) n
+  //      else findFork(n.children(0))
+  //    }
+  //    val fork = findFork(root)
+  //    val newLeaf = new FPNode(fork.itemName,fork.parent,ListBuffer())
+  //    newLeaf.count = fork.count
+  //    fork.parent.children(0) == newLeaf
+  //    val newRoot = new FPNode("", null, ListBuffer())
+  //    newRoot.children=fork.children
+  //    val multiPathPortion = new FPTree(newRoot,supportThreshold,frequentItems)
+  //    (this, multiPathPortion)
+  //  }
 
   def isSinglePath: Boolean = {
     def recur(n: Node): Boolean = {
@@ -341,11 +341,11 @@ case class FPTree(root: Node, supportThreshold: Int, frequentItems: List[Item]) 
   }
 
   //TODO: move out to a utility class somewhere
-  def combinations(base:Item,
+  def combinations(base: Item,
                    singlePath: List[(Item, Int)]): List[Pattern] = {
     (1 to singlePath.length).map(n => {
       // gather all the subsequences of size n
-      val orderedPrefixs = orderedSubsequences(singlePath,n)
+      val orderedPrefixs = ListMethods.orderedSubsequences(singlePath, n)
       // for each one of these merge it with the base item and get count right
       orderedPrefixs.map(op => {
         val min = op.map(_._2).min //TODO: refactor to do this biz in one pass
@@ -354,49 +354,45 @@ case class FPTree(root: Node, supportThreshold: Int, frequentItems: List[Item]) 
     }).toList.flatten
   }
 
-  /**
-   * In order to generate all the patterns I need to be able to calculate all the
-   * ordered distinct subsequences of a list.  e.g.
-   *
-   * input: (a,b,c,d)
-   * output: orderedSubsequences(input, 1) = ((a), (b), (c), (d))
-   *         orderedSubsequences(input, 2) = ((a,b), (a,c), (a,d), (b,c), (b,d), (c,d)
-   *         orderedSubsequences(input, 3) = ((a,b,c), (a,b,d), (a,c,d), (b,c,d))
-   *         orderedSubsequences(input, 4) = ((a,b,c,d))
-   *
-   * There is a recursive relationship to be exploited here: at level n I generate by
-   * looking back to level n-1.  emit a joined run of everything greater than the last element
-   * of the previous generation's pattern.
-   *
-   * @param list
-   * @param length
-   * @tparam T
-   * @return
-   */
-  //TODO: memoize for performance improvement
-  def orderedSubsequences[T](list: List[T], length: Int): List[List[T]] = length match {
-    case 0 => List(List())
-    case 1 => list.map(List(_))
-    case n if n < list.length =>
-      orderedSubsequences(list,n-1).map(l => { // for each of the prior sequences
-        list.drop(list.indexOf(l.last)+1) // for each element of the list to the right
-          .map(elem => l ::: List(elem)) //build a new list
-      }).flatten // flatten :)
-    case n if n == list.length => List(list)
+  def singlePathCombos(singlePath: List[(Item, Int)]): List[Pattern] = {
+    (1 to singlePath.length).map(n => {
+      // gather all subsequences
+      val subseqs = ListMethods.orderedSubsequences(singlePath, n)
+      subseqs.map(op => {
+        val min = op.map(_._2).min //TODO: refactor to use last
+        (op.map(_._1), min)
+      })
+    }).toList.flatten
+  }
+
+  def frequent1Patterns: List[Pattern] = {
+    // grab each frequent item and accumulate its counts across conditional tree.
+    // TODO: figure a better way to do this
+    this.frequentItems.map((item: Item) =>
+          (List(item), this.frequentItemHeader(item).nodeLinkList.map(_.count).sum))
   }
 
   def FPGrowth: List[Pattern] = {
-    frequentItems.foldLeft(List[Pattern]())((patterns, item) => {
-      val cfp = conditionalFPTree(item)
-      // TODO: Is this the best way to get the count... seems wasteful
-      val itemCount = frequentItemHeader(item).nodeLinkList.map(_.count).sum
-      if (cfp.isSinglePath) {
-        //pop out the combinations with counts correct
-        patterns ::: List((List(item), itemCount)) ::: combinations(item, cfp.toList)
-      } else {
-        patterns ::: cfp.FPGrowth
-      }
-    })
+    def joinPatterns(p1: Pattern, p2: Pattern): Pattern = {
+      (p1._1 ::: p2._1, if (p1._2 < p2._2) p1._2 else p2._2)
+    }
+    def recur(tree: FPTree, patternBase: Pattern): List[Pattern] = {
+      tree.frequent1Patterns.flatMap((pattern: Pattern) => {
+        val cfpt: FPTree = tree.conditionalFPTree(pattern._1(0))
+        val firstPart: List[Pattern] = cfpt.frequent1Patterns.map(p => joinPatterns(joinPatterns(p,pattern), patternBase))
+        firstPart ::: recur(tree.conditionalFPTree(pattern._1(0)), joinPatterns(pattern, patternBase))
+      })
+    }
+    this.frequent1Patterns ::: recur(this, (List(), Int.MaxValue))
+  }
+
+  def noCountsFPGrowth: List[ItemSet] = {
+    def recur(tree: FPTree, itemSet: ItemSet): List[ItemSet] = {
+      tree.frequentItems.flatMap((item: Item) => {
+        tree.conditionalFPTree(item).frequentItems.map(_ :: item :: itemSet) ::: recur(tree.conditionalFPTree(item), item :: itemSet)
+      })
+    }
+    this.frequentItems.map(List(_)) ::: recur(this, List())
   }
 }
 

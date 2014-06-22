@@ -1,11 +1,8 @@
-package adt
-
-import org.scalatest.FunSuite
+package com.tetra.adt
 
 import org.junit.runner.RunWith
+import org.scalatest.FunSuite
 import org.scalatest.junit.JUnitRunner
-
-import adt._
 
 /**
  * Tests for the FPTree implementation
@@ -51,8 +48,8 @@ class FPTreeSuite extends FunSuite {
 
   test("The complete set of frequent item projections can be derived") {
     new TestTransactions {
-      val frequentItemProjections = l1.map(fp2.frequentItemProjection)
-      assert(frequentItemProjections.forall(fp2.contains))
+      val frequentItemProjections = l1.map(fp1.frequentItemProjection)
+      assert(frequentItemProjections.forall(fp1.contains))
     }
   }
 
