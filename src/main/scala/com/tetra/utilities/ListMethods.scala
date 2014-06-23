@@ -6,7 +6,7 @@ package com.tetra.utilities
 trait ListMethods {
 
   /**
-   * In order to generate all the patterns I need to be able to calculate all the
+   * In certain circumstances patterns I need to be able to calculate all the
    * ordered distinct subsequences of a list.  e.g.
    *
    * input: (a,b,c,d)
@@ -24,16 +24,19 @@ trait ListMethods {
    * @tparam T
    * @return
    */
-  //TODO: memoize for performance improvement
-  def orderedSubsequences[T](list: List[T], length: Int): List[List[T]] = length match {
-    case 0 => List(List())
-    case 1 => list.map(List(_))
-    case n if n < list.length =>
-      orderedSubsequences(list,n-1).map(l => { // for each of the prior sequences
-        list.drop(list.indexOf(l.last)+1) // for each element of the list to the right
-          .map(elem => l ::: List(elem)) //build a new list
-      }).flatten // flatten :)
-    case n if n == list.length => List(list)
+  //TODO: memoize for performance improvement?
+  def orderedSubsequences[T](list: List[T], length: Int): List[List[T]] = {
+    require(length >= 0, "negative length lists not allowed")
+    length match {
+      case 0 => List(List())
+      case 1 => list.map(List(_))
+      case n if n < list.length =>
+        orderedSubsequences(list,n-1).flatMap(l => { // for each of the prior sequences
+          list.drop(list.indexOf(l.last)+1) // for each element of the list to the right
+            .map(elem => l ::: List(elem)) //build a new list
+        })
+      case n if n >= list.length => List(list)
+    }
   }
 
 }

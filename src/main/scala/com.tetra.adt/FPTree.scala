@@ -23,14 +23,10 @@ import scala.annotation.tailrec
 
 object FPTree {
 
-
-  /**
-   * Construct an FPTree from a sequence of transactions
-   */
   type Item = String
   type ItemSet = List[Item]
   type Transaction = List[String]
-  //note the distiction between this and ItemSet
+  //note the distinction between this and ItemSet
   type TransactionDB = List[Transaction]
 
   type ItemTable = mutable.Map[Item, Node]
@@ -252,25 +248,6 @@ case class FPTree(root: Node, supportThreshold: Int, frequentItems: List[Item]) 
     val start = new FPTree(emptyRoot, supportThreshold, freqItems)
     conditionalPatternBase(itemName).foldLeft(start)(_ insertPatternBase _)
   }
-
-  /**
-   * In order to implement FP-growth I need the ability to split a tree into
-   * Single prefix path and multi-path portions.
-   */
-  //  def splitTree: (FPTree, FPTree) = {
-  //    def findFork(n:Node): Node = {
-  //      if (n.children.length != 1) n
-  //      else findFork(n.children(0))
-  //    }
-  //    val fork = findFork(root)
-  //    val newLeaf = new FPNode(fork.itemName,fork.parent,ListBuffer())
-  //    newLeaf.count = fork.count
-  //    fork.parent.children(0) == newLeaf
-  //    val newRoot = new FPNode("", null, ListBuffer())
-  //    newRoot.children=fork.children
-  //    val multiPathPortion = new FPTree(newRoot,supportThreshold,frequentItems)
-  //    (this, multiPathPortion)
-  //  }
 
   def isSinglePath: Boolean = {
     def recur(n: Node): Boolean = {
