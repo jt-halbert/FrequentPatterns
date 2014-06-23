@@ -1,8 +1,7 @@
 package com.tetra.transformers
 
 
-import com.tetra.adt.FPTree.TransactionDB
-import com.tetra.transformers.FrequentPatterns.Pattern
+import com.tetra.adt.FPTree.{Pattern, TransactionDB}
 import com.tetra.utilities.ListMethods
 import org.junit.runner.RunWith
 import org.scalatest.FunSuite

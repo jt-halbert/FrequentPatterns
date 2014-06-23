@@ -1,12 +1,12 @@
 package com.tetra.adt
 
-import com.tetra.adt.FPTree.{ItemSet, ItemTable, Item, Transaction}
-import com.tetra.transformers.FrequentPatterns.Pattern
+import com.tetra.adt.FPTree._
 import com.tetra.utilities.ListMethods
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.annotation.tailrec
+import scala.Some
 
 
 /**
@@ -23,15 +23,28 @@ import scala.annotation.tailrec
 
 object FPTree {
 
+  /**
+   * Data:
+   *
+   *  For this method we have the following fundamental data types.
+   *
+   *  An "TransactionDB" contains "Transactions" that can be transformed
+   *  into collections of "Item"s.  These "ItemSets" occur "Count" number of
+   *  times in the TransactionDB.
+   *
+   *  A so-called "Pattern" is a tuple of an ItemSet and it's Count.
+   *
+   */
   type Item = String
+  type Count = Int
   type ItemSet = List[Item]
+  type Pattern = (ItemSet, Count)
   type Transaction = List[String]
   //note the distinction between this and ItemSet
   type TransactionDB = List[Transaction]
 
   type ItemTable = mutable.Map[Item, Node]
 
-  //TODO: refactor code to use Item, ItemSet, Transaction, TransactionDB
   def apply(transactions: TransactionDB,
             supportThreshold: Int = 0,
             select: (Transaction => ItemSet) = x => x): FPTree = {
@@ -60,7 +73,7 @@ abstract class Node {
 
   var count = 0
 
-  def insert(freqItems: List[String], frequentItemHeader: ItemTable): Node = {
+  def insert(freqItems: List[Item], frequentItemHeader: ItemTable): Node = {
 
     /**
      * If root has a child n such that n.itemName == items.head, then increment n's count by 1;
@@ -68,29 +81,29 @@ abstract class Node {
      * nodes with the same itemName.  If items.tail is non-empty then
      * call insertTree(items.tail,n)
      *
-     * @param items these are the items pulled from a transaction; in a more general case
+     * @param itemSet these are the items pulled from a transaction; in a more general case
      *              they could have data accessed by item.itemName //TODO: implement that.
      * @param r a representation of a tree
      * @return
      */
     //TODO: refactor pull-up this and insertPatternBase
-    def insertTree(items: List[String], r: Node): Unit = {
-      if (items.nonEmpty) {
-        val i = r.children.indexWhere(_.itemName == items.head)
+    def insertTree(itemSet: ItemSet, r: Node): Unit = {
+      if (itemSet.nonEmpty) {
+        val i = r.children.indexWhere(_.itemName == itemSet.head)
         if (i > -1) {
           r.children(i).count += 1
-          insertTree(items.tail, r.children(i))
+          insertTree(itemSet.tail, r.children(i))
         } else {
-          var newNode = FPNode(items.head, r, ListBuffer())
+          var newNode = FPNode(itemSet.head, r, ListBuffer())
           newNode.count += 1
           r.children += newNode
-          if (frequentItemHeader.contains(items.head)) {
+          if (frequentItemHeader.contains(itemSet.head)) {
             //add new nodeLink in the chain
-            frequentItemHeader(items.head).lastNodeLinked.nodeLink = newNode
+            frequentItemHeader(itemSet.head).lastNodeLinked.nodeLink = newNode
           } else {
-            frequentItemHeader(items.head) = newNode
+            frequentItemHeader(itemSet.head) = newNode
           }
-          insertTree(items.tail, newNode)
+          insertTree(itemSet.tail, newNode)
         }
       }
     }
@@ -192,7 +205,7 @@ case class FPTree(root: Node, supportThreshold: Int, frequentItems: List[Item]) 
    * @param patternBase in form (List(c,f,m,a): Prefix,3: count)
    * @return
    */
-  def insertPatternBase(patternBase: (List[String], Int)): FPTree = {
+  def insertPatternBase(patternBase: Pattern): FPTree = {
     val (pattern, count) = patternBase
     def recur(pattern: List[String], n: Node): Unit = {
       if (pattern.nonEmpty) {
@@ -224,7 +237,7 @@ case class FPTree(root: Node, supportThreshold: Int, frequentItems: List[Item]) 
   def conditionalFPTree(itemName: String): FPTree = {
     val emptyRoot = FPNode("", null, ListBuffer())
     // form the frequent items for this new smaller DB
-    val conditionalDB = conditionalPatternBase(itemName)
+    val conditionalDB = conditionalPatternDB(itemName)
     // one pass to take List[(List[String], Int)] to a histogram
     /**
      * we choose to represent the intermediate patterns as List[(List[String],Int)]
@@ -236,17 +249,13 @@ case class FPTree(root: Node, supportThreshold: Int, frequentItems: List[Item]) 
      *
      *
      */
-    val freqItems = conditionalDB.map(t => {
-      // split each List, Int tuple into a sequence of String,Int tuples
-      t._1.foldLeft(List[(String, Int)]())((acc, n) => (n, t._2) :: acc)
-    })
-      .flatten //flatten it to a list of String,Int tuples
+    val freqItems = conditionalDB.flatMap(t => t._1.map((_,t._2))) // split into single item tuples
       .groupBy(_._1) //gather by itemName into a Map
       .mapValues(_.map(_._2).sum) //sum counts
       .toList.filter(_._2 > supportThreshold).map(_._1) // take the names of the frequent ones
       .sortBy(frequentItems.indexOf(_)) // sort into the node occurrence order
     val start = new FPTree(emptyRoot, supportThreshold, freqItems)
-    conditionalPatternBase(itemName).foldLeft(start)(_ insertPatternBase _)
+    conditionalPatternDB(itemName).foldLeft(start)(_ insertPatternBase _)
   }
 
   def isSinglePath: Boolean = {
@@ -299,7 +308,7 @@ case class FPTree(root: Node, supportThreshold: Int, frequentItems: List[Item]) 
    * @param itemName an item name that occurs in the frequentItemHeader
    * @return a list of patterns annotated with the count for that pattern
    */
-  def conditionalPatternBase(itemName: String): List[(List[String], Int)] = {
+  def conditionalPatternDB(itemName: String): List[Pattern] = {
     require(frequentItemHeader.contains(itemName), "can't find conditional pattern-base")
     type Pattern = (List[String], Int)
     frequentItemHeader(itemName).nodeLinkList.foldLeft(List[Pattern]())({
