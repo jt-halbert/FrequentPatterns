@@ -1,8 +1,8 @@
-package com.tetra.transformers
+package com.tetraconcepts.transformers
 
 
-import com.tetra.adt.FPTree.{Pattern, TransactionDB}
-import com.tetra.utilities.ListMethods
+import com.tetraconcepts.adt.FPTree.{Pattern, TransactionDB}
+import com.tetraconcepts.utilities.ListMethods
 import org.junit.runner.RunWith
 import org.scalatest.FunSuite
 import org.scalatest.junit.JUnitRunner

@@ -1,4 +1,4 @@
-package com.tetra.utilities
+package com.tetraconcepts.utilities
 
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -10,11 +10,11 @@ import org.scalatest.FunSuite
  */
 @RunWith(classOf[JUnitRunner])
 class ListMethodsTest extends FunSuite {
-  trait TestSequence {
+  trait TestList {
     val list = List("a","b","c","d")
   }
   test("orderedSubsequences emits correct sequences") {
-    new TestSequence {
+    new TestList {
       val expected1seq = List(List("a"), List("b"), List("c"), List("d"))
       val expected2seq = List(List("a", "b"), List("a", "c"), List("a", "d"),
         List("b", "c"), List("b", "d"), List("c", "d"))
@@ -31,7 +31,7 @@ class ListMethodsTest extends FunSuite {
   }
 
   test("orderedSubsequences should throw exception on negative length") {
-    new TestSequence {
+    new TestList {
       intercept[IllegalArgumentException] {
         ListMethods.orderedSubsequences(list,-1)
       }

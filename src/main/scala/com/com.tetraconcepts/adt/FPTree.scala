@@ -1,12 +1,11 @@
-package com.tetra.adt
+package com.tetraconcepts.adt
 
-import com.tetra.adt.FPTree._
-import com.tetra.utilities.ListMethods
+import com.tetraconcepts.adt.FPTree._
+import com.tetraconcepts.utilities.ListMethods
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
-import scala.annotation.tailrec
-import scala.Some
 
 
 /**

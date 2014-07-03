@@ -1,4 +1,4 @@
-package com.tetra.adt
+package com.tetraconcepts.adt
 
 import org.junit.runner.RunWith
 import org.scalatest.FunSuite

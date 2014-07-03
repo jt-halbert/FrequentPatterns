@@ -1,4 +1,4 @@
-package com.tetra.utilities
+package com.tetraconcepts.utilities
 
 /**
  * Created by jthalbert on 6/21/14.

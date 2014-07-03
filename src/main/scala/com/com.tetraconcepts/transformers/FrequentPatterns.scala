@@ -1,7 +1,7 @@
-package com.tetra.transformers
+package com.tetraconcepts.transformers
 
-import com.tetra.adt.FPTree
-import com.tetra.adt.FPTree.{Pattern, Transaction, TransactionDB, ItemSet}
+import com.tetraconcepts.adt.FPTree
+import com.tetraconcepts.adt.FPTree.{Pattern, Transaction, TransactionDB, ItemSet}
 
 /**
  * This is the overarching application that transforms transaction DBs
